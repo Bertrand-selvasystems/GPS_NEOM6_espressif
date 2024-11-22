@@ -1,0 +1,7 @@
+source "C:/Users/Bertrand/esp/v5.3.1/esp-idf/components/bootloader/Kconfig.projbuild"
+source "C:/Users/Bertrand/esp/v5.3.1/esp-idf/components/esp_app_format/Kconfig.projbuild"
+source "C:/Users/Bertrand/esp/v5.3.1/esp-idf/components/esp_rom/Kconfig.projbuild"
+source "C:/Users/Bertrand/esp/v5.3.1/esp-idf/components/esptool_py/Kconfig.projbuild"
+source "C:/Users/Bertrand/esp/v5.3.1/esp-idf/components/partition_table/Kconfig.projbuild"
+source "H:/PROJETS/MAGNETOMETRE MEMS/PROGRAMME/GPS_NEOM6_espressif/main/Kconfig.projbuild"
+source "H:/PROJETS/MAGNETOMETRE MEMS/PROGRAMME/GPS_NEOM6_espressif/managed_components/atanisoft__esp_lcd_touch_xpt2046/Kconfig.projbuild"
