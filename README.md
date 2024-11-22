@@ -1,100 +1,165 @@
-| Supported Targets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C6 | ESP32-H2 | ESP32-P4 | ESP32-S2 | ESP32-S3 |
-| ----------------- | ----- | -------- | -------- | -------- | -------- | -------- | -------- | -------- |
 
-# SPI LCD and Touch Panel Example
+# GPS NEO-M6 Library for ESP-IDF
 
-[esp_lcd](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/lcd.html) provides several panel drivers out-of box, e.g. ST7789, SSD1306, NT35510. However, there're a lot of other panels on the market, it's beyond `esp_lcd` component's responsibility to include them all.
+## Description
 
-`esp_lcd` allows user to add their own panel drivers in the project scope (i.e. panel driver can live outside of esp-idf), so that the upper layer code like LVGL porting code can be reused without any modifications, as long as user-implemented panel driver follows the interface defined in the `esp_lcd` component.
+This library provides an interface for using the **NEO-M6 GPS module** with the ESP-IDF framework. It supports parsing NMEA frames, extracting GPS data such as latitude, longitude, altitude, speed, and date/time, and managing GPS configuration, including setting the update rate.
 
-This example shows how to use GC9A01 or ILI9341 display driver from Component manager in esp-idf project. These components are using API provided by `esp_lcd` component. This example will draw a fancy dash board with the LVGL library.
+The library uses **UART communication** to receive GPS data and includes checksum verification for data integrity. It supports the `$GPGGA` and `$GPRMC` NMEA frames for precise GPS positioning and navigation data.
 
-This example uses the [esp_timer](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/esp_timer.html) to generate the ticks needed by LVGL and uses a dedicated task to run the `lv_timer_handler()`. Since the LVGL APIs are not thread-safe, this example uses a mutex which be invoked before the call of `lv_timer_handler()` and released after it. The same mutex needs to be used in other tasks and threads around every LVGL (lv_...) related function call and code. For more porting guides, please refer to [LVGL porting doc](https://docs.lvgl.io/master/porting/index.html).
+## Features
 
-## Touch controller STMPE610
+- Parse `$GPGGA` frames for:
+  - Latitude, longitude (in decimal degrees)
+  - Altitude
+  - Number of satellites in view
+  - Fix quality
+- Parse `$GPRMC` frames for:
+  - Latitude, longitude (in decimal degrees)
+  - Speed (in knots)
+  - Date and time
+  - Fix validity
+- Verify checksum for NMEA strings.
+- Configure GPS update rate (1-10 Hz).
+- Example FreeRTOS task to process GPS data.
 
-In this example you can enable touch controller STMPE610 connected via SPI. The SPI connection is shared with LCD screen.
+## Requirements
 
-## How to use the example
+- **ESP-IDF** framework version `>= v4.0`.
+- **NEO-M6 GPS module** (or similar with NMEA support).
+- UART GPIO pins configured for ESP32.
 
-### Hardware Required
+## Installation
 
-* An ESP development board
-* An GC9A01 or ILI9341 LCD panel, with SPI interface (with/without STMPE610 SPI touch)
-* An USB cable for power supply and programming
+1. Clone the repository into your ESP-IDF project's components folder:
+   ```bash
+   git clone https://github.com/your-repository-url components/gps
+   ```
+2. Include the header file in your project:
+   ```c
+   #include "gps.h"
+   ```
 
-### Hardware Connection
+## Quick Start
 
-The connection between ESP Board and the LCD is as follows:
+### 1. Initialize GPS Module
 
-```
-       ESP Board                       GC9A01/ILI9341 Panel + TOUCH
-┌──────────────────────┐              ┌────────────────────┐
-│             GND      ├─────────────►│ GND                │
-│                      │              │                    │
-│             3V3      ├─────────────►│ VCC                │
-│                      │              │                    │
-│             PCLK     ├─────────────►│ SCL                │
-│                      │              │                    │
-│             MOSI     ├─────────────►│ MOSI               │
-│                      │              │                    │
-│             MISO     |◄─────────────┤ MISO               │
-│                      │              │                    │
-│             RST      ├─────────────►│ RES                │
-│                      │              │                    │
-│             DC       ├─────────────►│ DC                 │
-│                      │              │                    │
-│             LCD CS   ├─────────────►│ LCD CS             │
-│                      │              │                    │
-│             TOUCH CS ├─────────────►│ TOUCH CS           │
-│                      │              │                    │
-│             BK_LIGHT ├─────────────►│ BLK                │
-└──────────────────────┘              └────────────────────┘
-```
+Configure the UART interface and set the desired baud rate:
 
-The GPIO number used by this example can be changed in [lvgl_example_main.c](main/spi_lcd_touch_example_main.c).
-Especially, please pay attention to the level used to turn on the LCD backlight, some LCD module needs a low level to turn it on, while others take a high level. You can change the backlight level macro `EXAMPLE_LCD_BK_LIGHT_ON_LEVEL` in [lvgl_example_main.c](main/spi_lcd_touch_example_main.c).
+```c
+#include "gps.h"
 
-### Build and Flash
+#define GPS_UART_BAUD 9600
+#define TX_PIN 17
+#define RX_PIN 16
 
-Run `idf.py -p PORT build flash monitor` to build, flash and monitor the project. A fancy animation will show up on the LCD as expected.
-
-The first time you run `idf.py` for the example will cost extra time as the build system needs to address the component dependencies and downloads the missing components from registry into `managed_components` folder.
-
-(To exit the serial monitor, type ``Ctrl-]``.)
-
-See the [Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for full steps to configure and use ESP-IDF to build projects.
-
-### Example Output
-
-```bash
-...
-I (409) cpu_start: Starting scheduler on APP CPU.
-I (419) example: Turn off LCD backlight
-I (419) gpio: GPIO[2]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0
-I (429) example: Initialize SPI bus
-I (439) example: Install panel IO
-I (439) gpio: GPIO[5]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0
-I (449) example: Install GC9A01 panel driver
-I (459) gpio: GPIO[3]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0
-I (589) gpio: GPIO[0]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0
-I (589) example: Initialize touch controller STMPE610
-I (589) STMPE610: TouchPad ID: 0x0811
-I (589) STMPE610: TouchPad Ver: 0x03
-I (599) example: Turn on LCD backlight
-I (599) example: Initialize LVGL library
-I (609) example: Register display driver to LVGL
-I (619) example: Install LVGL tick timer
-I (619) example: Starting LVGL task
-I (619) example: Display LVGL animation
-I (619) example: Display LVGL Meter Widget
-...
+void app_main() {
+    if (GPS_Init(GPS_UART_BAUD, TX_PIN, RX_PIN) == ESP_OK) {
+        ESP_LOGI("MAIN", "GPS initialized successfully!");
+    } else {
+        ESP_LOGE("MAIN", "Failed to initialize GPS.");
+    }
+}
 ```
 
+### 2. Read GPS Data
 
-## Troubleshooting
+Read and process GPS data in a FreeRTOS task:
 
-* Why the LCD doesn't light up?
-  * Check the backlight's turn-on level, and update it in `EXAMPLE_LCD_BK_LIGHT_ON_LEVEL`
+```c
+void gps_task(void *param) {
+    GPSData_t gps_data;
 
-For any technical queries, please open an [issue] (https://github.com/espressif/esp-idf/issues) on GitHub. We will get back to you soon.
+    while (1) {
+        if (GPS_ReadData(&gps_data)) {
+            if (gps_data.valid) {
+                ESP_LOGI("GPS_Task", "Latitude: %.6f, Longitude: %.6f", gps_data.latitude, gps_data.longitude);
+                ESP_LOGI("GPS_Task", "Date: %02d/%02d/%04d, Time: %02d:%02d:%02d",
+                         gps_data.day, gps_data.month, gps_data.year,
+                         gps_data.hour, gps_data.minute, gps_data.second);
+                ESP_LOGI("GPS_Task", "Altitude: %.2f m, Speed: %.2f knots",
+                         gps_data.altitude, gps_data.speed);
+            } else {
+                ESP_LOGW("GPS_Task", "Invalid GPS data received.");
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+```
+
+### 3. Configure GPS Update Rate
+
+Set the update rate to 5 Hz:
+
+```c
+if (GPS_SetUpdateRate(5) == ESP_OK) {
+    ESP_LOGI("MAIN", "GPS update rate set to 5 Hz");
+} else {
+    ESP_LOGE("MAIN", "Failed to set GPS update rate");
+}
+```
+
+## API Reference
+
+### `esp_err_t GPS_Init(uint32_t baud_rate, int tx_pin, int rx_pin)`
+
+Initializes the UART for communication with the GPS module.
+
+- **baud_rate**: GPS UART baud rate (e.g., 9600).
+- **tx_pin**: GPIO number for UART TX.
+- **rx_pin**: GPIO number for UART RX.
+- **Returns**:
+  - `ESP_OK` on success.
+  - `ESP_ERR_*` on failure.
+
+---
+
+### `bool GPS_ReadData(GPSData_t *gps_data)`
+
+Reads and parses NMEA frames from the GPS module.
+
+- **gps_data**: Pointer to a `GPSData_t` structure to store parsed data.
+- **Returns**:
+  - `true` if valid data is received.
+  - `false` otherwise.
+
+---
+
+### `esp_err_t GPS_SetUpdateRate(uint8_t rate_hz)`
+
+Configures the GPS module's update rate (1-10 Hz).
+
+- **rate_hz**: Desired update rate in Hz.
+- **Returns**:
+  - `ESP_OK` if successful.
+  - `ESP_ERR_INVALID_ARG` if the rate is out of range.
+
+---
+
+## GPSData_t Structure
+
+```c
+typedef struct {
+    float latitude;
+    float longitude;
+    float altitude;
+    float speed;
+    int day, month, year;
+    int hour, minute, second;
+    bool valid;
+} GPSData_t;
+```
+
+## Example Project
+
+Clone the [example project](https://github.com/your-repository-url) to see the library in action with a full FreeRTOS task implementation.
+
+## License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.
+
+## Contributions
+
+Contributions are welcome! Feel free to submit pull requests or open issues for bugs and feature requests.
+
